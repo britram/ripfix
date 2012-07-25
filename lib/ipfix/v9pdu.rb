@@ -34,7 +34,7 @@ module IPFIX
   class V9PDUStream
     extend EventDispatch
 
-    attr_reader :template, :domain, :export_time, :base_time, :sysuptime_ms
+    attr_reader :session, :template, :domain, :export_time, :base_time, :sysuptime_ms, :sequence
   
     event :new_message
     
@@ -65,7 +65,7 @@ module IPFIX
         raise FormatError, "Incomplete V9 PDU header from #{@io.inspect}"
       end
       
-      @sysuptime_ms, export_epoch, sequence, @domain = hdr.unpack("N43")
+      @sysuptime_ms, export_epoch, @sequence, @domain = hdr.unpack("N43")
        
       # store export time
       @export_time = Time.at(export_epoch).utc
@@ -155,9 +155,9 @@ module IPFIX
     
     def initialize(filename, model)
       if (filename == "-")
-        super(STDIN,model)
+        super(Session.new(model), STDIN)
       else
-        super(File.new(filename,"r"),new Session(model))
+        super(Session.new(model), File.new(filename,"r"))
       end
     end
     
