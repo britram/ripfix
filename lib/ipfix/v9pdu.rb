@@ -36,7 +36,7 @@ module IPFIX
 
     attr_reader :template, :domain, :export_time, :base_time, :sysuptime_ms
   
-    event :new_pdu
+    event :new_message
     
     HeaderLen = 20
     SetHeaderLen = 4
@@ -73,7 +73,7 @@ module IPFIX
       # calculate and store base time: FIXME, need correction factor
       @base_time = @export_time - (@sysuptime_ms / 1000.0)
       
-      post_new_pdu(self)
+      post_new_message(self)
       
       count
     end
@@ -143,5 +143,26 @@ module IPFIX
       end
     end
   end
+  
+  class V9FileReader < V9PDUStream
+    
+    def self.open(filename, model)
+      cp = V9FileReader.new(filename, model)
+      yield cp
+    ensure
+      cp.close
+    end
+    
+    def initialize(filename, model)
+      if (filename == "-")
+        super(STDIN,model)
+      else
+        super(File.new(filename,"r"),new Session(model))
+      end
+    end
+    
+    
+  end
+  
 end
 

@@ -55,6 +55,8 @@ while arg = ARGV.shift
     msgmode = false
   elsif (/^flow/.match(arg))
     flowmode = true
+  elsif (/^v9/.match(arg))
+    v9mode = true
   end
 end
 
@@ -82,7 +84,12 @@ end
 
 # start listening
 if fixfile
-  c = FileReader.new(fixfile, model)
+  if (v9mode)
+    require 'ipfix/v9pdu'
+    c = V9FileReader.new(fixfile, model)
+  else
+    c = FileReader.new(fixfile, model)
+  end
 elsif tcpmode
   cs = TCPCollectorServer.new(host, port, model)
   c = nil
@@ -118,6 +125,7 @@ Signal.trap("INT", cleanup)
 
 # set up session handlers
 if c.respond_to?(:session)
+  # collector with a single session
   c.session.on_template_add do |domain, template|
     tmplcount += 1
     if tmplmode 
@@ -135,6 +143,7 @@ if c.respond_to?(:session)
     puts " **** bad sequence for domain #{message.domain}: got #{message.sequence}, expected #{expected} ****"
   end
 else
+  # collector with a session table - add code to register handlers with each new session
   c.session_table.on_new_session do |session|
     session.on_template_add do |domain, template| 
       tmplcount += 1
@@ -156,9 +165,11 @@ else
 end
 
 # set up message handler
-c.on_new_message do |message|
-  msgcount += 1
-  puts "===== message #{message.domain}/#{message.sequence} @#{message.export_time} (##{msgcount}) =====" if msgmode
+if msgmode && c.respond_to?(:on_new_message)
+  c.on_new_message do |message|
+    msgcount += 1
+    puts "===== message #{message.domain}/#{message.sequence} @#{message.export_time} (##{msgcount}) ====="
+  end
 end
 
 # iterate over records
