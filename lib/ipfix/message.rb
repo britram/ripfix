@@ -683,8 +683,7 @@ public
     end
     
     def inspect
-      headroom = @sets[-1] ? @sets[-1].limit - @sets[-1].length : mtu - HeaderLen - SetBuffer::SetHeaderLen
-      "<Message domain #{@domain} seq #{@sequence}: #{@template_count} T #{@data_count} D #{headroom} avail>"
+      "<Message domain #{@domain} seq #{@sequence}: #{@template_count} TR #{@data_count} DR>"
     end
     
   end # class Message
