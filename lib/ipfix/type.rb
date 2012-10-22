@@ -329,11 +329,11 @@ public
   class BooleanType < UnsignedType
 private
     def encode_vec(val, len)
-      super(val ? 1 : 0, len)
+      super(val ? 1 : 2, len)
     end
 
     def decode_vec(vec)
-      (super(vec) == 0) ? false : true
+      (super(vec) == 1) ? true : false
     end
     
 public
