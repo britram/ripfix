@@ -226,7 +226,12 @@ module IPFIX
 #
 
     def limit
-      SetHeaderLen + super
+      suplim = super
+      if (suplim) 
+        SetHeaderLen + suplim
+      else
+        nil
+      end
     end
 
 #

@@ -187,44 +187,44 @@ module IPFIX
        end
      end
      
-     def test_udp_simple
-       runs = 100
-       
-       assert model = TestCommons.model
-       exported = TestCommons.exported
-       expected = TestCommons.expected
-       
-       collector = Thread.new do
-         assert cp = UDPCollector.new('localhost', 4739, model)
-       
-         count = 0
-         cp.each do |h|
-           assert_equal(expected[count % expected.length], h)
-           count = count + 1
-         end
-     
-         assert_equal(runs * expected.length, count)
-       
-         cp.close
-         cps.close
-       end
-       
-       exporter = Thread.new do 
-         assert ep = UDPExporter.new('localhost', 4739, model, 7654)
-         ep.message.mtu = 576
-       
-         TestCommons.templates(model).each { |t| assert ep << t }
-         runs.times do 
-           exported.each { |h| assert ep << h }
-         end
-     
-         ep.close
-       end
-       
-       exporter.join
-       collector.join
-       
-     end
+     # def test_udp_simple
+     #   runs = 100
+     #   
+     #   assert model = TestCommons.model
+     #   exported = TestCommons.exported
+     #   expected = TestCommons.expected
+     #   
+     #   collector = Thread.new do
+     #     assert cp = UDPCollector.new('localhost', 4739, model)
+     #   
+     #     count = 0
+     #     cp.each do |h|
+     #       assert_equal(expected[count % expected.length], h)
+     #       count = count + 1
+     #     end
+     # 
+     #     assert_equal(runs * expected.length, count)
+     #   
+     #     cp.close
+     #     cps.close
+     #   end
+     #   
+     #   exporter = Thread.new do 
+     #     assert ep = UDPExporter.new('localhost', 4739, model, 7654)
+     #     ep.message.mtu = 576
+     #   
+     #     TestCommons.templates(model).each { |t| assert ep << t }
+     #     runs.times do 
+     #       exported.each { |h| assert ep << h }
+     #     end
+     # 
+     #     ep.close
+     #   end
+     #   
+     #   exporter.join
+     #   collector.join
+     #   
+     # end
 
      
      def test_tcp_simple

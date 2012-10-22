@@ -46,6 +46,7 @@ module IPFIX
 
   class Collector
     extend EventDispatch
+    include Enumerable
     
     event :new_message
 
