@@ -20,15 +20,22 @@ module EventDispatch
 #     
   
   def event(event_name)
+
     define_method("post_#{event_name}") do |*args|
       if @_event_handlers && @_event_handlers[event_name]
         @_event_handlers[event_name].call(*args)
       end
     end
-    #private("post_#{event_name}")
+
+    define_method("set_#{event_name}_proc") do |proc|
+      @_event_handlers = Hash.new unless @_event_handlers
+      @_event_handlers[event_name] = proc
+    end
+
     define_method("on_#{event_name}") do |&handler|
       @_event_handlers = Hash.new unless @_event_handlers
       @_event_handlers[event_name] = handler
     end
+    
   end
 end

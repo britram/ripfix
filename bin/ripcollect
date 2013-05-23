@@ -2,6 +2,7 @@
 #
 #--
 # ripfix (IPFIX for Ruby) (c) 2010 Brian Trammell and Hitachi Europe SAS
+#                         (c) 2012 Brian Trammell
 # Special thanks to the PRISM Consortium (fp7-prism.eu) for its support.
 # Distributed under the terms of the GNU Lesser General Public License v3.
 #++
