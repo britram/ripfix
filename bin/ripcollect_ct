@@ -1,9 +1,16 @@
 #!/usr/bin/env ruby1.9
 
-rc = CollectorTool.new
-ARGV = rc.parse_args(ARGV)
+require 'ipfix/tool'
+include IPFIX
 
-rc.start
+msgcount = 0
+tmplcount = 0
+reccount = 0
+
+rc = CollectorTool.new
+rc.parse_args(ARGV)
+
+rc.start_collector
 
 rc.on_template_add do |domain, template|
   tmplcount += 1
@@ -25,7 +32,7 @@ rc.on_new_message do |message|
   puts "===== message #{message.domain}/#{message.sequence} @#{message.export_time} (##{msgcount}) ====="
 end
 
-c.each do |h, m|
+rc.each do |h, m|
   reccount += 1
   puts "  --- record #{m.domain}/#{m.template.tid} (##{reccount})---"
   h.each do |k, v|
