@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby1.9
+
+require 'ipfix/tool'
+require 'csv'
+
+include IPFIX
+
+rc = CollectorTool.new
+cols = rc.parse_args(ARGV).map { |v| v.to_sym }
+
+rc.start_collector
+
+CSV do |csv_out|
+
+  csv_out << cols.map { |s| s.to_s }
+
+  rc.each do |h, m| 
+    csv_out << cols.map { |c| h[c] }
+  end
+end

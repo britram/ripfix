@@ -65,8 +65,10 @@ module IPFIX
           @port = argm[2].to_i
         elsif parse_model
           @modelfiles << arg
+          parse_model = false
         elsif parse_file
           @fixfile = arg
+          parse_file = false
         else
           postargs << arg
         end

@@ -1,200 +1,47 @@
 #!/usr/bin/env ruby1.9
-#
-#--
-# ripfix (IPFIX for Ruby) (c) 2010 Brian Trammell and Hitachi Europe SAS
-#                         (c) 2012 Brian Trammell
-# Special thanks to the PRISM Consortium (fp7-prism.eu) for its support.
-# Distributed under the terms of the GNU Lesser General Public License v3.
-#++
-# Dumps an IPFIX file on standard input for debugging purposes. Takes one
-# optional argument on the command line, the name of an information model file 
-# to extend the default model
-#
 
-require 'ipfix/collector'
-require 'ipfix/iana'
-
+require 'ipfix/tool'
 include IPFIX
 
-# arg globals
-tcpmode = false
-udpmode = false
-sctpmode = false
-recmode = true
-tmplmode = true
-msgmode = true
-modelfiles = Array.new
-fixfile = nil
-host = nil
-port = 4739
-
-# counter globals
-reccount = 0
-tmplcount = 0
 msgcount = 0
+tmplcount = 0
+reccount = 0
 
-# parse args
-while arg = ARGV.shift
-  if (argm = /([^:]*)\:(\d+)/.match(arg))
-    host = argm[1].length > 0 ? argm[1] : nil
-    port = argm[2].to_i
-  elsif (argm = /^model:(\S+)/.match(arg))
-    modelfiles.push(argm[1])
-  elsif (argm = /^file:(\S+)/.match(arg))
-    fixfile = argm[1]
-  elsif (/^t/.match(arg))
-    tcpmode = true
-  elsif (/^u/.match(arg))
-    udpmode = true
-  elsif (/^s/.match(arg))
-    sctpmode = true
-  elsif (/^nor/.match(arg))
-    recmode = false
-  elsif (/^not/.match(arg))
-    tmplmode = false
-  elsif (/^nom/.match(arg))
-    msgmode = false
-  elsif (/^flow/.match(arg))
-    flowmode = true
-  elsif (/^v9/.match(arg))
-    v9mode = true
-  end
+rc = CollectorTool.new
+rc.parse_args(ARGV)
+
+rc.start_collector
+
+rc.on_template_add do |domain, template|
+  tmplcount += 1
+  isoptions = template.respond_to?(:scope_count) ? "options ": ""
+  puts "----- #{isoptions}template #{domain}/#{template.tid} (##{tmplcount}) -----"
+  puts template.spec
 end
 
-# load model
-model = InfoModel.new.load_default.load_reverse
-modelfiles.each do |modelfile| 
-  STDERR.puts("loading information model file #{modelfile}")
-  model.load(modelfile)
+rc.on_missing_template do |message, set|
+  puts "***** missing template for #{set.set_id} in domain #{message.domain} *****"
 end
 
-# hack hashkeys
-if flowmode
-  model.ie_for_spec("sourceIPv4Address").hashkey = :sip4
-  model.ie_for_spec("destinationIPv4Address").hashkey = :dip4
-  model.ie_for_spec("sourceIPv6Address").hashkey = :sip6
-  model.ie_for_spec("destinationIPv6Address").hashkey = :dip6
-  model.ie_for_spec("sourceTransportPort").hashkey = :sip4
-  model.ie_for_spec("destinationTransportPort").hashkey = :dip4
-  model.ie_for_spec("protocolIdentifier").hashkey = :proto
-  model.ie_for_spec("octetDeltaCount").hashkey = :bytes
-  model.ie_for_spec("packetDeltaCount").hashkey = :packets
-  model.ie_for_spec("reverseOctetDeltaCount").hashkey = :rbytes
-  model.ie_for_spec("reversePacketDeltaCount").hashkey = :rpackets
+rc.on_bad_sequence do |message, expected|
+  puts " **** bad sequence for domain #{message.domain}: got #{message.sequence}, expected #{expected} ****"
 end
 
-# start listening
-if fixfile
-  if (v9mode)
-    require 'ipfix/v9pdu'
-    c = V9FileReader.new(fixfile, model)
-  else
-    c = FileReader.new(fixfile, model)
-  end
-elsif tcpmode
-  cs = TCPCollectorServer.new(host, port, model)
-  c = nil
-elsif udpmode
-  c = UDPCollector.new(host, port, model)
-elsif sctpmode
-  require 'ipfix/sctp'
-  c = SCTPCollector.new(host, port, model)
-else 
-  STDERR.puts("No transport selected")
-  Process.exit(1)
+rc.on_new_message do |message|
+  msgcount += 1
+  puts "===== message #{message.domain}/#{message.sequence} @#{message.export_time} (##{msgcount}) ====="
 end
 
-# announce we're running (FIXME better logging)
-if fixfile
-  STDERR.puts "reading from #{fixfile}"
-else
-  transport = tcpmode ? "TCP" : udpmode ? "UDP" : "SCTP"
-  STDERR.puts "listening on #{host} #{transport} port #{port}"
-end
-
-c = cs.next_collector unless c
-
-# set up signal handler
-cleanup = Proc.new do
-  STDERR.puts("Terminating")
-  STDERR.puts("got #{msgcount} messages, #{tmplcount} templates, #{reccount} records")
-  c.close
-end
-
-Signal.trap("TERM", cleanup)
-Signal.trap("INT", cleanup)
-
-# set up session handlers
-if c.respond_to?(:session)
-  # collector with a single session
-  c.session.on_template_add do |domain, template|
-    tmplcount += 1
-    if tmplmode 
-      isoptions = template.respond_to?(:scope_count) ? "options ": ""
-      puts "----- #{isoptions}template #{domain}/#{template.tid} (##{tmplcount}) -----"
-      puts template.spec
-    end
-  end
-  
-  c.session.on_missing_template do |message, set|
-    puts "***** missing template for #{set.set_id} in domain #{message.domain} *****"
-  end
-  
-  c.session.on_bad_sequence do |message, expected|
-    puts " **** bad sequence for domain #{message.domain}: got #{message.sequence}, expected #{expected} ****"
-  end
-else
-  # collector with a session table - add code to register handlers with each new session
-  c.session_table.on_new_session do |session|
-    session.on_template_add do |domain, template| 
-      tmplcount += 1
-      if tmplmode 
-        isoptions = template.respond_to?(:scope_count) ? "options ": ""
-        puts "----- #{isoptions}template #{domain}/#{template.tid} (##{tmplcount}) -----"
-        puts template.spec
-      end
-    end
-
-    session.on_missing_template do |message, set|
-      puts "***** missing template for #{set.set_id} in domain #{message.domain} *****"
-    end
-
-    session.on_bad_sequence do |message, expected|
-      puts " **** bad sequence for domain #{message.domain}: got #{message.sequence}, expected #{expected} ****"
-    end
-  end
-end
-
-# set up message handler
-if msgmode && c.respond_to?(:on_new_message)
-  c.on_new_message do |message|
-    msgcount += 1
-    puts "===== message #{message.domain}/#{message.sequence} @#{message.export_time} (##{msgcount}) ====="
-  end
-end
-
-# iterate over records
-c.each do |h, m|
+rc.each do |h, m|
   reccount += 1
-  if recmode
-    puts "  --- record #{m.domain}/#{m.template.tid} (##{reccount})---"
-    h.each do |k, v|
-      if v.kind_of? Array
-        puts "#{k} =>"
-        puts Buffer.dump(v)
-      else
-        puts "#{k} => #{v.to_s}"
-      end
-    end
-  elsif flowmode
-    if h[:sip4]
-      sip = h[:sip4]
-      dip = h[:dip4]
+  puts "  --- record #{m.domain}/#{m.template.tid} (##{reccount})---"
+  h.each do |k, v|
+    if v.kind_of? Array
+      puts "#{k} =>"
+      puts Buffer.dump(v)
     else
-      sip = h[:sip6]
-      dip = h[:sip6]
+      puts "#{k} => #{v.to_s}"
     end
-    puts "#{sip}:#{h[:sp]} => #{dip}:#{h[:dp]} [#{h[:proto]}] (#{h[:packets]}/#{h[:bytes]}) <-> (#{h[:rpackets]}/#{h[:rbytes]})"
   end
 end
 
