@@ -15,6 +15,7 @@ CSV do |csv_out|
   csv_out << cols.map { |s| s.to_s }
 
   rc.each do |h, m| 
-    csv_out << cols.map { |c| h[c] }
+    values = cols.map { |c| h[c] }
+    csv_out << values unless values.include?(nil)
   end
 end
